@@ -116,19 +116,20 @@ class BytePairEncodingTokenizer:
         return stack
 
     def decode(self, tokens: List[int]) -> str:
+        @lru_cache(maxsize=10_000)
+        def expand(token: int) -> Tuple[int]:
+            if token not in self.vocab:
+                return (token,)
+            left, right = self.vocab[token]
+            return expand(left) + expand(right)
+
         byte_unicodes = [
             bytes([int_unicode])
             for token in tokens
-            for int_unicode in (self.special_vocab[token] if token in self.special_vocab else self.__expand(token))
+            for int_unicode in (self.special_vocab[token] if token in self.special_vocab else expand(token))
         ]
-        return b"".join(byte_unicodes).decode("utf-8")
 
-    @lru_cache(maxsize=None)
-    def __expand(self, token: int) -> Tuple[int]:
-        if token not in self.vocab:
-            return (token,)
-        left, right = self.vocab[token]
-        return self.__expand(left) + self.__expand(right)
+        return b"".join(byte_unicodes).decode("utf-8")
 
 
 if __name__ == "__main__":
